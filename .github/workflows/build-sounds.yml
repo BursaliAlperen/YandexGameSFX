@@ -1,0 +1,65 @@
+name: Build and commit CC0 MP3 sound library
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg unzip
+      - name: Build Sounds folders
+        shell: bash
+        run: |
+          set -e
+          rm -rf Sounds build
+          mkdir -p build/src Sounds
+          curl -L --fail "https://opengameart.org/sites/default/files/80-CC0-creature-SFX.zip" -o build/src/creature.zip
+          curl -L --fail "https://opengameart.org/sites/default/files/80-CC0-RPG-SFX.zip" -o build/src/rpg.zip
+          curl -L --fail "https://opengameart.org/sites/default/files/8-bit%20Sound%20Effects%20Pack%20%28001%29.zip" -o build/src/8bit.zip || true
+          unzip -q build/src/creature.zip -d build/creature
+          unzip -q build/src/rpg.zip -d build/rpg
+          mkdir -p Sounds/{Zombie,Zombie_Cartoon,Monster,Monster_Cartoon,Funny,Hit,Death,Hurt,Magic,Spell,Attack,Sword,Explosion,Coin,Pickup,UI,Click,Footstep,Whoosh,LevelUp,PowerUp,Slime,Boss,Item,RPG,Ambient}
+          find build -type f \( -iname "*.wav" -o -iname "*.ogg" -o -iname "*.flac" -o -iname "*.mp3" \) | while read -r f; do
+            n="$(basename "$f")"
+            l="$(printf '%s' "$n" | tr '[:upper:]' '[:lower:]')"
+            cat="RPG"
+            case "$l" in
+              *zombie*|*undead*|*groan*|*moan*) cat="Zombie_Cartoon" ;;
+              *slime*|*squish*|*squelch*|*burble*) cat="Slime" ;;
+              *monster*|*creature*|*growl*|*roar*|*alien*|*troll*) cat="Monster_Cartoon" ;;
+              *death*|*die*|*dead*|*gameover*|*defeat*|*kill*|*scream*) cat="Death" ;;
+              *hurt*|*damage*) cat="Hurt" ;;
+              *magic*|*spell*|*curse*|*witch*|*fire*|*ice*) cat="Magic" ;;
+              *sword*|*blade*|*slash*|*saber*) cat="Sword" ;;
+              *attack*|*strike*|*shoot*|*weapon*) cat="Attack" ;;
+              *hit*|*punch*|*thwack*|*smack*) cat="Hit" ;;
+              *explosion*|*explode*|*blast*|*bomb*|*boom*) cat="Explosion" ;;
+              *coin*|*gold*|*cash*|*gem*) cat="Coin" ;;
+              *pickup*|*collect*|*item*|*chest*) cat="Pickup" ;;
+              *click*|*button*|*press*) cat="Click" ;;
+              *ui*|*menu*|*select*|*confirm*|*error*) cat="UI" ;;
+              *footstep*|*step*|*walk*|*run*) cat="Footstep" ;;
+              *whoosh*|*swish*|*swoosh*|*swing*) cat="Whoosh" ;;
+              *levelup*|*level-up*|*achievement*) cat="LevelUp" ;;
+              *powerup*|*power-up*|*upgrade*) cat="PowerUp" ;;
+              *boss*) cat="Boss" ;;
+              *ambient*|*wind*|*rain*|*water*|*nature*) cat="Ambient" ;;
+              *grunt*|*burp*|*cute*|*funny*|*accordion*|*cartoon*) cat="Funny" ;;
+            esac
+            out="Sounds/$cat/$(printf '%s' "$n" | sed 's/\.[^.]*$//').mp3"
+            ffmpeg -loglevel error -y -i "$f" -codec:a libmp3lame -q:a 3 "$out"
+          done
+          cp "$PWD"/Sounds/RPG/*.mp3 /tmp/rpg.mp3 2>/dev/null || true
+          find Sounds -type d -empty -delete
+      - name: Commit MP3 archive
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Sounds
+          git commit -m "Add CC0 MP3 sound library [skip ci]" || echo "No changes"
+          git push
