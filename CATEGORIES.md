@@ -1,0 +1,1 @@
+Automatic categories: ui, click, hit, impact, magic, attack, sword, death, monster, zombie, explosion, coin, pickup, whoosh, footstep, laser, powerup, levelup, animal, ambient, misc. The script uses filename keyword scoring and never deletes the original source tree.
