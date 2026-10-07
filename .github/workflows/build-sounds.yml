@@ -5,44 +5,77 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg unzip
-      - name: Build Sounds folders
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg unzip curl
+
+      - name: Download and validate CC0 packs
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           rm -rf Sounds build
           mkdir -p build/src Sounds
-          curl -L --fail "https://opengameart.org/sites/default/files/80-CC0-creature-SFX.zip" -o build/src/creature.zip
-          curl -L --fail "https://opengameart.org/sites/default/files/80-CC0-RPG-SFX.zip" -o build/src/rpg.zip
-          curl -L --fail "https://opengameart.org/sites/default/files/100-CC0-SFX.zip" -o build/src/100sfx.zip
+
+          download() {
+            local url="$1"
+            local out="$2"
+            echo "Downloading $url"
+            curl --location --fail --show-error --silent --retry 5 --retry-all-errors \
+              --connect-timeout 20 --max-time 120 "$url" -o "$out"
+            test -s "$out"
+            unzip -tq "$out"
+          }
+
+          # OpenGameArt file links currently resolve with the "_0" suffix.
+          # The old workflow used the unsuffixed paths, which caused the 404.
+          download "https://opengameart.org/sites/default/files/80-CC0-creature-SFX_0.zip" build/src/creature.zip
+          download "https://opengameart.org/sites/default/files/80-CC0-RPG-SFX_0.zip" build/src/rpg.zip
+          download "https://opengameart.org/sites/default/files/100-CC0-SFX_0.zip" build/src/100sfx.zip
+
           unzip -q build/src/creature.zip -d build/creature
           unzip -q build/src/rpg.zip -d build/rpg
           unzip -q build/src/100sfx.zip -d build/100sfx
+
+      - name: Convert sounds to MP3 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+
           mkdir -p Sounds/{Zombie,Zombie_Cartoon,Monster,Monster_Cartoon,Funny,Hit,Death,Hurt,Magic,Spell,Attack,Sword,Explosion,Coin,Pickup,UI,Click,Footstep,Whoosh,LevelUp,PowerUp,Slime,Boss,Item,RPG,Ambient}
-          find build -type f \( -iname "*.wav" -o -iname "*.ogg" -o -iname "*.flac" -o -iname "*.mp3" \) | while read -r f; do
+
+          count=0
+          while IFS= read -r -d '' f; do
+            count=$((count + 1))
             n="$(basename "$f")"
             l="$(printf '%s' "$n" | tr '[:upper:]' '[:lower:]')"
             cat="RPG"
+
             case "$l" in
-              *zombie*|*undead*|*groan*|*moan*) cat="Zombie_Cartoon" ;;
+              *zombie*) cat="Zombie" ;;
+              *undead*|*groan*|*moan*) cat="Zombie_Cartoon" ;;
               *slime*|*squish*|*squelch*|*burble*) cat="Slime" ;;
-              *monster*|*creature*|*growl*|*roar*|*alien*|*troll*) cat="Monster_Cartoon" ;;
+              *monster*|*growl*|*roar*|*alien*|*troll*) cat="Monster" ;;
+              *creature*|*cute*|*grunt*|*burp*|*eat*|*ooh*|*weird*) cat="Monster_Cartoon" ;;
               *death*|*die*|*dead*|*gameover*|*defeat*|*kill*|*scream*) cat="Death" ;;
               *hurt*|*damage*) cat="Hurt" ;;
-              *magic*|*spell*|*curse*|*witch*|*fire*|*ice*) cat="Magic" ;;
+              *spell*) cat="Spell" ;;
+              *magic*|*curse*|*witch*|*fire*|*ice*) cat="Magic" ;;
               *sword*|*blade*|*slash*|*saber*) cat="Sword" ;;
               *attack*|*strike*|*shoot*|*weapon*) cat="Attack" ;;
               *hit*|*punch*|*thwack*|*smack*) cat="Hit" ;;
               *explosion*|*explode*|*blast*|*bomb*|*boom*) cat="Explosion" ;;
               *coin*|*gold*|*cash*|*gem*) cat="Coin" ;;
-              *pickup*|*collect*|*item*|*chest*) cat="Pickup" ;;
-              *click*|*button*|*press*) cat="Click" ;;
+              *pickup*|*collect*) cat="Pickup" ;;
+              *item*|*chest*|*book*|*page*|*key*|*lock*) cat="Item" ;;
+              *click*|*button*|*press*|*switch*) cat="Click" ;;
               *ui*|*menu*|*select*|*confirm*|*error*) cat="UI" ;;
               *footstep*|*step*|*walk*|*run*) cat="Footstep" ;;
               *whoosh*|*swish*|*swoosh*|*swing*) cat="Whoosh" ;;
@@ -50,19 +83,52 @@ jobs:
               *powerup*|*power-up*|*upgrade*) cat="PowerUp" ;;
               *boss*) cat="Boss" ;;
               *ambient*|*wind*|*rain*|*water*|*nature*) cat="Ambient" ;;
-              *grunt*|*burp*|*cute*|*funny*|*accordion*|*cartoon*) cat="Funny" ;;
+              *funny*|*cartoon*|*plop*|*spring*) cat="Funny" ;;
             esac
+
             stem="$(printf '%s' "$n" | sed 's/\.[^.]*$//')"
             src="$(printf '%s' "$f" | cut -d/ -f2)"
             out="Sounds/$cat/${src}_${stem}.mp3"
-            ffmpeg -loglevel error -y -i "$f" -codec:a libmp3lame -q:a 3 "$out"
-          done
-          cp "$PWD"/Sounds/RPG/*.mp3 /tmp/rpg.mp3 2>/dev/null || true
-          find Sounds -type d -empty -delete
-      - name: Commit MP3 archive
+
+            ffmpeg -hide_banner -loglevel error -nostdin -y \
+              -i "$f" -map_metadata -1 -codec:a libmp3lame -q:a 3 "$out"
+          done < <(find build -type f \( -iname "*.wav" -o -iname "*.ogg" -o -iname "*.flac" -o -iname "*.mp3" \) -print0)
+
+          test "$count" -gt 0
+          total="$(find Sounds -type f -name '*.mp3' | wc -l)"
+          test "$total" -gt 0
+          echo "Created $total MP3 files from $count source files."
+
+      - name: Write source/license manifest
+        shell: bash
         run: |
+          cat > Sounds/SOURCES.md <<'EOF'
+          # CC0 sound sources
+
+          All source packs used by this build are marked CC0 on OpenGameArt.org:
+
+          - 80 CC0 creature SFX — rubberduck
+          - 80 CC0 RPG SFX — rubberduck
+          - 100 CC0 SFX — rubberduck
+
+          Source pages:
+          - https://opengameart.org/content/80-cc0-creature-sfx
+          - https://opengameart.org/content/80-cc0-rpg-sfx
+          - https://opengameart.org/content/100-cc0-sfx
+
+          The workflow converts the source audio to MP3 for use in the archive.
+          EOF
+
+      - name: Commit MP3 archive
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Sounds
-          git commit -m "Add CC0 MP3 sound library [skip ci]" || echo "No changes"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Build CC0 MP3 sound library [skip ci]"
+            git push origin HEAD:main
+          fi
