@@ -3,7 +3,7 @@ import shutil, sys
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-SRC=ROOT/"assets"/"open-game-sfx-index"
+SRC=ROOT/"assets"
 OUT=ROOT/"categorized"
 CATS=["ui","click","hit","impact","magic","attack","sword","death","monster","zombie","explosion","coin","pickup","whoosh","footstep","laser","powerup","levelup","animal","ambient","misc"]
 RULES={"zombie":["zombie","undead","groan","moan","gore"],"monster":["monster","creature","growl","roar","beast","alien"],"death":["death","die","dead","gameover","defeat","kill","scream"],"explosion":["explosion","explode","blast","bomb","boom"],"magic":["magic","spell","cast","curse","fire","ice","earth","arcane","witch"],"sword":["sword","blade","slash","clash","saber","knife"],"hit":["hit","punch","thwack","smack","hurt","damage"],"impact":["impact","crash","slam","thud"],"attack":["attack","strike","shoot","shot","weapon"],"click":["click","button","press","switch","toggle"],"ui":["ui","interface","menu","select","confirm","cancel","hover","error","notification"],"coin":["coin","money","cash","gold","gem"],"pickup":["pickup","pick","collect","item","chest","bonus"],"whoosh":["whoosh","swish","swoosh","swing","wind"],"footstep":["footstep","step","walk","run"],"laser":["laser","phaser","beam","zap","ray"],"powerup":["powerup","power-up","power","bonus","upgrade"],"levelup":["levelup","level-up","level up","achievement"],"animal":["animal","dog","cat","bird","horse","rat","frog"],"ambient":["ambient","wind","rain","water","fire","nature"]}
