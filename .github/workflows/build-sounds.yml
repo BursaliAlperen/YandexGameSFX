@@ -20,9 +20,10 @@ jobs:
           mkdir -p build/src Sounds
           curl -L --fail "https://opengameart.org/sites/default/files/80-CC0-creature-SFX.zip" -o build/src/creature.zip
           curl -L --fail "https://opengameart.org/sites/default/files/80-CC0-RPG-SFX.zip" -o build/src/rpg.zip
-          curl -L --fail "https://opengameart.org/sites/default/files/8-bit%20Sound%20Effects%20Pack%20%28001%29.zip" -o build/src/8bit.zip || true
+          curl -L --fail "https://opengameart.org/sites/default/files/100-CC0-SFX.zip" -o build/src/100sfx.zip
           unzip -q build/src/creature.zip -d build/creature
           unzip -q build/src/rpg.zip -d build/rpg
+          unzip -q build/src/100sfx.zip -d build/100sfx
           mkdir -p Sounds/{Zombie,Zombie_Cartoon,Monster,Monster_Cartoon,Funny,Hit,Death,Hurt,Magic,Spell,Attack,Sword,Explosion,Coin,Pickup,UI,Click,Footstep,Whoosh,LevelUp,PowerUp,Slime,Boss,Item,RPG,Ambient}
           find build -type f \( -iname "*.wav" -o -iname "*.ogg" -o -iname "*.flac" -o -iname "*.mp3" \) | while read -r f; do
             n="$(basename "$f")"
@@ -51,7 +52,9 @@ jobs:
               *ambient*|*wind*|*rain*|*water*|*nature*) cat="Ambient" ;;
               *grunt*|*burp*|*cute*|*funny*|*accordion*|*cartoon*) cat="Funny" ;;
             esac
-            out="Sounds/$cat/$(printf '%s' "$n" | sed 's/\.[^.]*$//').mp3"
+            stem="$(printf '%s' "$n" | sed 's/\.[^.]*$//')"
+            src="$(printf '%s' "$f" | cut -d/ -f2)"
+            out="Sounds/$cat/${src}_${stem}.mp3"
             ffmpeg -loglevel error -y -i "$f" -codec:a libmp3lame -q:a 3 "$out"
           done
           cp "$PWD"/Sounds/RPG/*.mp3 /tmp/rpg.mp3 2>/dev/null || true
